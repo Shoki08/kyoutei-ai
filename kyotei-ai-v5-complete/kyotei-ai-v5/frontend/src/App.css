@@ -1,0 +1,15 @@
+.App {
+  text-align: center;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+
+.error {
+  color: red;
+  padding: 20px;
+}
