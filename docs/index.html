@@ -6,38 +6,64 @@
     <title>Kyotei AI Pro</title>
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <style>
-        :root { --primary: #0055aa; --rough: #d63031; --solid: #00b894; --bg: #f5f6fa; }
-        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); margin: 0; padding-bottom: 80px; color: #333; }
-        header { background: var(--primary); color: white; padding: 15px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        h1 { margin: 0; font-size: 18px; text-align: center; }
+        :root { 
+            --primary: #0055aa; 
+            --rough: #d63031; 
+            --solid: #00b894; 
+            --skip: #b2bec3; /* SKIP用のグレー */
+            --bg: #f5f6fa; 
+            --text: #2d3436;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; background: var(--bg); margin: 0; padding-bottom: 80px; color: var(--text); -webkit-tap-highlight-color: transparent; }
+        header { background: var(--primary); color: white; padding: 15px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.15); }
+        h1 { margin: 0; font-size: 18px; text-align: center; font-weight: 700; letter-spacing: 0.5px; }
         
         .container { max-width: 600px; margin: 0 auto; padding: 15px; }
-        .race-card { background: white; border-radius: 12px; margin-bottom: 15px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .race-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
-        .stadium-name { font-weight: bold; font-size: 1.1em; }
-        .race-num { background: #333; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.9em; }
+        .race-card { background: white; border-radius: 16px; margin-bottom: 20px; padding: 0; box-shadow: 0 4px 20px rgba(0,0,0,0.05); overflow: hidden; }
         
-        .logic-badge { padding: 3px 8px; border-radius: 4px; color: white; font-size: 0.8em; margin-left: 8px; }
-        .logic-SOLID { background: var(--solid); }
-        .logic-ROUGH { background: var(--rough); }
+        .race-header { padding: 12px 20px; background: #f8f9fa; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .stadium-info { display: flex; align-items: center; gap: 10px; }
+        .stadium-code { font-weight: 800; font-size: 16px; color: var(--text); }
+        .race-no { font-size: 14px; color: #636e72; background: #dfe6e9; padding: 2px 8px; border-radius: 12px; font-weight: bold; }
         
-        .bet-box { font-family: monospace; font-size: 1.2em; font-weight: bold; margin: 5px 0; display: flex; align-items: center; }
-        .icon { margin-right: 8px; }
+        .logic-badge { padding: 4px 10px; border-radius: 6px; color: white; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; text-transform: uppercase; }
+        .logic-SOLID { background: var(--solid); box-shadow: 0 2px 5px rgba(0,184,148,0.3); }
+        .logic-ROUGH { background: var(--rough); box-shadow: 0 2px 5px rgba(214,48,49,0.3); }
+        .logic-SKIP { background: var(--skip); color: #636e72; box-shadow: none; }
 
-        .fab { position: fixed; bottom: 20px; right: 20px; width: 56px; height: 56px; background: var(--primary); color: white; border-radius: 50%; border: none; font-size: 24px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); cursor: pointer; }
+        .prediction-area { padding: 15px 20px; }
         
-        .error-box { background: #ffecec; color: #d63031; padding: 20px; border-radius: 8px; text-align: center; margin-top: 20px; line-height: 1.6; }
-        code { background: #eee; padding: 2px 4px; border-radius: 3px; }
+        /* 買い目の行デザイン */
+        .bet-row { display: flex; align-items: center; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px dashed #eee; }
+        .bet-row:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+        
+        .bet-icon { font-size: 18px; margin-right: 12px; width: 24px; text-align: center; }
+        .bet-numbers { font-family: 'Courier New', monospace; font-size: 20px; font-weight: 800; color: var(--text); letter-spacing: 1px; flex-grow: 1; }
+        
+        /* オッズの表示デザイン */
+        .bet-odds { font-size: 13px; color: #fff; background: var(--primary); padding: 2px 8px; border-radius: 12px; font-weight: bold; }
+        .bet-odds.low-odds { background: #b2bec3; } /* 安いオッズ */
+        .bet-odds.high-odds { background: var(--rough); } /* 穴オッズ */
+
+        /* SKIP時のメッセージ */
+        .skip-message { text-align: center; color: #b2bec3; font-weight: bold; padding: 10px; font-size: 14px; }
+
+        .fab { position: fixed; bottom: 25px; right: 25px; width: 60px; height: 60px; background: var(--primary); color: white; border-radius: 50%; border: none; font-size: 28px; box-shadow: 0 4px 15px rgba(0,85,170,0.4); cursor: pointer; transition: transform 0.2s; z-index: 1000; display: flex; justify-content: center; align-items: center; }
+        .fab:active { transform: scale(0.95); }
+        
+        .error-box { background: #fff0f0; color: #d63031; padding: 20px; border-radius: 12px; text-align: center; margin-top: 20px; font-size: 14px; line-height: 1.6; border: 1px solid #ffcccc; }
     </style>
 </head>
 <body>
-    <header><h1>競艇AI予想 Pro</h1></header>
+    <header><h1>Kyotei AI Pro</h1></header>
     
     <div class="container" id="app">
-        <div style="text-align:center; padding: 40px; color: #999;">
-            データを読み込んでいます...
+        <div style="text-align:center; padding: 60px 20px; color: #b2bec3;">
+            <div style="font-size: 40px; margin-bottom: 20px;">🚤</div>
+            データを解析中...
         </div>
     </div>
 
@@ -47,42 +73,21 @@
         async function fetchData() {
             const app = document.getElementById('app');
             
-            // ローカルファイル実行チェック
+            // ローカル実行チェック
             if (window.location.protocol === 'file:') {
-                app.innerHTML = `
-                    <div class="error-box">
-                        <strong>⚠️ 実行環境エラー</strong><br>
-                        HTMLファイルを直接開いています。<br>
-                        ブラウザのセキュリティ制限によりデータを取得できません。<br><br>
-                        VS Codeのターミナルで以下を実行し、<br>
-                        <code>python -m http.server</code><br>
-                        表示されるURL (localhost:8000) にアクセスしてください。
-                    </div>`;
+                app.innerHTML = `<div class="error-box">⚠️ ローカルファイルエラー<br>python -m http.server を実行してください</div>`;
                 return;
             }
 
             try {
                 const ts = new Date().getTime();
                 const res = await fetch(`data/latest_odds.json?t=${ts}`);
-                
-                if (!res.ok) {
-                    throw new Error(`HTTP Status: ${res.status}`);
-                }
-                
+                if (!res.ok) throw new Error("データ取得失敗");
                 const data = await res.json();
                 renderApp(data);
-                
             } catch (e) {
                 console.error(e);
-                app.innerHTML = `
-                    <div class="error-box">
-                        <strong>データ取得エラー</strong><br>
-                        ${e.message}<br><br>
-                        <small>
-                        1. scraper.py を実行してデータを作成しましたか？<br>
-                        2. docs/data/latest_odds.json は存在しますか？
-                        </small>
-                    </div>`;
+                app.innerHTML = `<div class="error-box"><strong>データ待機中</strong><br>次回更新(08:30)をお待ちください<br><span style="font-size:10px; opacity:0.7">${e.message}</span></div>`;
             }
         }
 
@@ -92,38 +97,76 @@
             const stadiumKeys = Object.keys(data).sort();
 
             if (stadiumKeys.length === 0) {
-                app.innerHTML = '<div class="error-box">本日の開催データが見つかりません。<br>Scraperを実行してください。</div>';
+                app.innerHTML = '<div class="error-box">本日の開催データなし</div>';
                 return;
             }
 
             stadiumKeys.forEach(jcd => {
                 const races = data[jcd];
-                // レースデータがある場合のみ表示
-                if (races.length > 0) {
-                    html += `<div style="margin-top:20px; font-weight:bold; color:#666;">場コード: ${jcd}</div>`;
-                }
+                if (races.length === 0) return;
+
+                // 場ごとの区切り（任意）
+                // html += `<div style="margin: 20px 0 10px 10px; font-weight:bold; color:#636e72; font-size:12px;">場コード: ${jcd}</div>`;
                 
                 races.forEach(race => {
+                    const isSkip = race.prediction_logic === 'SKIP';
+                    
                     html += `
                     <div class="race-card">
                         <div class="race-header">
-                            <div>
-                                <span class="stadium-name">レース ${race.race_no}R</span>
-                                <span class="logic-badge logic-${race.prediction_logic}">${race.prediction_logic}</span>
+                            <div class="stadium-info">
+                                <span class="stadium-code">#${jcd}</span>
+                                <span class="race-no">${race.race_no}R</span>
                             </div>
-                            <span class="race-num">AI推奨</span>
+                            <span class="logic-badge logic-${race.prediction_logic}">${race.prediction_logic}</span>
                         </div>
-                        <div>
-                            ${race.predictions.map((p, i) => 
-                                `<div class="bet-box">
-                                    <span class="icon">${i===0 ? '🎯' : '⚠️'}</span> ${p}
-                                </div>`
-                            ).join('')}
+                        <div class="prediction-area">
+                            ${renderPredictions(race.predictions, isSkip)}
                         </div>
                     </div>`;
                 });
             });
-            app.innerHTML = html || '<div style="text-align:center; padding:20px;">有効な予測データがありません</div>';
+            app.innerHTML = html;
+        }
+
+        function renderPredictions(preds, isSkip) {
+            if (isSkip) {
+                // 見送りの場合はアイコンを出さずシンプルに
+                return `<div class="skip-message">🛑 ${preds[0]}</div>`;
+            }
+
+            return preds.map((p, i) => {
+                // オッズ解析 "1-2-3 (15.2倍)" -> bet="1-2-3", odds="15.2"
+                let bet = p;
+                let oddsHtml = '';
+                
+                // 正規表現でオッズ部分を抽出
+                const match = p.match(/(.+)\s\((.+倍)\)/);
+                if (match) {
+                    bet = match[1];
+                    const oddsVal = parseFloat(match[2].replace('倍',''));
+                    // オッズによって色を変える
+                    let oddsClass = 'bet-odds';
+                    if (oddsVal < 5.0) oddsClass += ' low-odds'; // 安い
+                    if (oddsVal > 20.0) oddsClass += ' high-odds'; // 穴
+                    
+                    oddsHtml = `<span class="${oddsClass}">${match[2]}</span>`;
+                } else if (p.includes("安いかも")) {
+                     oddsHtml = `<span class="bet-odds low-odds">注意</span>`;
+                }
+
+                // アイコン決定
+                let icon = '⚠️';
+                if (i === 0) icon = '🎯'; // 本命
+                if (i === 1) icon = '🥈'; // 対抗
+                
+                return `
+                <div class="bet-row">
+                    <span class="bet-icon">${icon}</span>
+                    <span class="bet-numbers">${bet}</span>
+                    ${oddsHtml}
+                </div>`;
+            }).join('');
         }
 
         if ('serviceWorker' in navigator) {
