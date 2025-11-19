@@ -3,90 +3,133 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kyotei AI</title>
+    <title>Kyotei AI Pro</title>
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="KyoteiAI">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <style>
-        /* iOSライクなUI [cite: 110-131] */
         :root { --primary: #0055aa; --rough: #d63031; --solid: #00b894; --bg: #f5f6fa; }
-        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); margin: 0; padding-bottom: 80px; -webkit-tap-highlight-color: transparent; }
-        header { background: var(--primary); color: white; padding: 15px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        h1 { margin: 0; font-size: 18px; text-align: center; font-weight: 600; }
-        .container { max-width: 600px; margin: 0 auto; padding: 10px; }
-        .race-card { background: white; border-radius: 12px; margin-bottom: 15px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .race-header { padding: 10px 15px; background: #f1f2f6; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e1e1e1; }
-        .stadium-badge { font-weight: bold; color: #2d3436; }
-        .race-num { background: #2d3436; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
-        .logic-tag { display: inline-block; font-size: 10px; padding: 3px 6px; border-radius: 4px; margin-left: 10px; color: white; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); margin: 0; padding-bottom: 80px; color: #333; }
+        header { background: var(--primary); color: white; padding: 15px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        h1 { margin: 0; font-size: 18px; text-align: center; }
+        
+        .container { max-width: 600px; margin: 0 auto; padding: 15px; }
+        .race-card { background: white; border-radius: 12px; margin-bottom: 15px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .race-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+        .stadium-name { font-weight: bold; font-size: 1.1em; }
+        .race-num { background: #333; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.9em; }
+        
+        .logic-badge { padding: 3px 8px; border-radius: 4px; color: white; font-size: 0.8em; margin-left: 8px; }
         .logic-SOLID { background: var(--solid); }
         .logic-ROUGH { background: var(--rough); }
-        .prediction-area { padding: 15px; }
-        .bet-row { font-family: 'Courier New', monospace; font-size: 18px; font-weight: bold; color: #2d3436; margin: 5px 0; display: flex; align-items: center; }
-        .bet-icon { margin-right: 10px; font-size: 14px; }
-        .fab { position: fixed; bottom: 20px; right: 20px; background: var(--primary); color: white; width: 56px; height: 56px; border-radius: 50%; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 10px rgba(0,85,170,0.4); cursor: pointer; font-size: 24px; border: none; }
+        
+        .bet-box { font-family: monospace; font-size: 1.2em; font-weight: bold; margin: 5px 0; display: flex; align-items: center; }
+        .icon { margin-right: 8px; }
+
+        .fab { position: fixed; bottom: 20px; right: 20px; width: 56px; height: 56px; background: var(--primary); color: white; border-radius: 50%; border: none; font-size: 24px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); cursor: pointer; }
+        
+        .error-box { background: #ffecec; color: #d63031; padding: 20px; border-radius: 8px; text-align: center; margin-top: 20px; line-height: 1.6; }
+        code { background: #eee; padding: 2px 4px; border-radius: 3px; }
     </style>
 </head>
 <body>
-<header><h1>競艇AI予想 (Beta)</h1></header>
-<div class="container" id="app">
-    <div style="text-align:center; padding: 50px; color: #b2bec3;">Loading Data...</div>
-</div>
-<button class="fab" onclick="fetchData()">↻</button>
+    <header><h1>競艇AI予想 Pro</h1></header>
+    
+    <div class="container" id="app">
+        <div style="text-align:center; padding: 40px; color: #999;">
+            データを読み込んでいます...
+        </div>
+    </div>
 
-<script>
-    async function fetchData() {
-        const app = document.getElementById('app');
-        try {
-            const timestamp = new Date().getTime();
-            // GitHub PagesのJSONを取得
-            const res = await fetch(`data/latest_odds.json?t=${timestamp}`);
-            if (!res.ok) throw new Error("データ取得失敗");
-            const data = await res.json();
-            renderApp(data);
-        } catch (e) {
-            console.error(e);
-            app.innerHTML = `<div style="padding:20px; text-align:center; color:var(--rough);">データ更新エラー<br>まだレースデータが生成されていないか、通信環境がありません。</div>`;
-        }
-    }
+    <button class="fab" onclick="fetchData()">↻</button>
 
-    function renderApp(data) {
-        const app = document.getElementById('app');
-        let html = '';
-        const stadiumKeys = Object.keys(data).sort();
-        if (stadiumKeys.length === 0) {
-            app.innerHTML = '<div style="text-align:center; padding:40px;">本日の開催データなし</div>';
-            return;
+    <script>
+        async function fetchData() {
+            const app = document.getElementById('app');
+            
+            // ローカルファイル実行チェック
+            if (window.location.protocol === 'file:') {
+                app.innerHTML = `
+                    <div class="error-box">
+                        <strong>⚠️ 実行環境エラー</strong><br>
+                        HTMLファイルを直接開いています。<br>
+                        ブラウザのセキュリティ制限によりデータを取得できません。<br><br>
+                        VS Codeのターミナルで以下を実行し、<br>
+                        <code>python -m http.server</code><br>
+                        表示されるURL (localhost:8000) にアクセスしてください。
+                    </div>`;
+                return;
+            }
+
+            try {
+                const ts = new Date().getTime();
+                const res = await fetch(`data/latest_odds.json?t=${ts}`);
+                
+                if (!res.ok) {
+                    throw new Error(`HTTP Status: ${res.status}`);
+                }
+                
+                const data = await res.json();
+                renderApp(data);
+                
+            } catch (e) {
+                console.error(e);
+                app.innerHTML = `
+                    <div class="error-box">
+                        <strong>データ取得エラー</strong><br>
+                        ${e.message}<br><br>
+                        <small>
+                        1. scraper.py を実行してデータを作成しましたか？<br>
+                        2. docs/data/latest_odds.json は存在しますか？
+                        </small>
+                    </div>`;
+            }
         }
-        stadiumKeys.forEach(jcd => {
-            const races = data[jcd];
-            races.forEach(race => {
-                html += `
-                <div class="race-card">
-                    <div class="race-header">
-                        <div>
-                            <span class="stadium-badge">場コード: ${jcd}</span>
-                            <span class="logic-tag logic-${race.prediction_logic}">${race.prediction_logic}</span>
+
+        function renderApp(data) {
+            const app = document.getElementById('app');
+            let html = '';
+            const stadiumKeys = Object.keys(data).sort();
+
+            if (stadiumKeys.length === 0) {
+                app.innerHTML = '<div class="error-box">本日の開催データが見つかりません。<br>Scraperを実行してください。</div>';
+                return;
+            }
+
+            stadiumKeys.forEach(jcd => {
+                const races = data[jcd];
+                // レースデータがある場合のみ表示
+                if (races.length > 0) {
+                    html += `<div style="margin-top:20px; font-weight:bold; color:#666;">場コード: ${jcd}</div>`;
+                }
+                
+                races.forEach(race => {
+                    html += `
+                    <div class="race-card">
+                        <div class="race-header">
+                            <div>
+                                <span class="stadium-name">レース ${race.race_no}R</span>
+                                <span class="logic-badge logic-${race.prediction_logic}">${race.prediction_logic}</span>
+                            </div>
+                            <span class="race-num">AI推奨</span>
                         </div>
-                        <span class="race-num">${race.race_no}R</span>
-                    </div>
-                    <div class="prediction-area">
-                        ${race.predictions.map((p, i) => 
-                         `<div class="bet-row"><span class="bet-icon">${i===0? '🎯' : '⚠️'}</span>${p}</div>`
-                        ).join('')}
-                    </div>
-                </div>`;
+                        <div>
+                            ${race.predictions.map((p, i) => 
+                                `<div class="bet-box">
+                                    <span class="icon">${i===0 ? '🎯' : '⚠️'}</span> ${p}
+                                </div>`
+                            ).join('')}
+                        </div>
+                    </div>`;
+                });
             });
-        });
-        app.innerHTML = html;
-    }
+            app.innerHTML = html || '<div style="text-align:center; padding:20px;">有効な予測データがありません</div>';
+        }
 
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js');
-    }
-    fetchData();
-</script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(console.error);
+        }
+        fetchData();
+    </script>
 </body>
 </html>
