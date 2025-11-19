@@ -1,0 +1,39 @@
+name: Daily Kyotei Forecast
+
+on:
+  workflow_dispatch: # 手動実行用
+  schedule:
+    # JST 08:30 〜 20:30 まで 30分おきに実行
+    # UTCでは 23:30(前日) 〜 11:30 [cite: 87]
+    - cron: '0,30 23 * * *'
+    - cron: '0,30 0-11 * * *'
+
+permissions:
+  contents: write # リポジトリへのPush権限 [cite: 88]
+
+jobs:
+  ai-prediction-job:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests pandas beautifulsoup4 lxml html5lib
+
+      - name: Run Scraper Logic
+        run: python scraper.py
+
+      - name: Commit and Push Changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Daily Predictions [skip ci]"
+          file_pattern: 'docs/data/*.json docs/data/*.txt'
+          branch: main
