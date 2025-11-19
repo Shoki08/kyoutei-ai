@@ -24,16 +24,18 @@ USER_AGENTS = [
 
 class KyoteiPredictor:
     def __init__(self):
-        self.today = datetime.date.today()
+        # 【重要】GitHub Actions(UTC)でも日本時間(JST)の日付を取得する設定
+        t_delta = datetime.timedelta(hours=9)
+        JST = datetime.timezone(t_delta, 'JST')
+        self.today = datetime.datetime.now(JST).date()
         self.date_str = self.today.strftime("%Y%m%d")
-        # テスト用: 強制的に過去の日付にする場合はここを変更
-        # self.date_str = "20231119" 
+        print(f"Target Date (JST): {self.date_str}")
 
     def get_headers(self):
         return {"User-Agent": random.choice(USER_AGENTS)}
 
     def fetch_page(self, url):
-        """汎用ページ取得（リトライ付き）"""
+        """汎用ページ取得"""
         retries = 3
         for i in range(retries):
             try:
@@ -55,13 +57,11 @@ class KyoteiPredictor:
         soup = BeautifulSoup(resp.text, 'html.parser')
         stadiums = []
         
-        # リンクからjcdパラメータ抽出
         links = soup.find_all('a', href=True)
         for link in links:
             href = link['href']
             if "race_list" in href and "jcd=" in href:
                 try:
-                    # クエリ解析
                     query_part = href.split('?')[1] if '?' in href else href
                     params = {p.split('=')[0]: p.split('=')[1] for p in query_part.split('&') if '=' in p}
                     if 'jcd' in params:
@@ -71,25 +71,16 @@ class KyoteiPredictor:
         return sorted(list(set(stadiums)))
 
     def parse_weather(self, soup):
-        """【改良】気象情報をHTMLから正規表現で抽出"""
+        """気象情報を抽出"""
         weather_data = {"wind": 2, "wave": 2, "wind_dir": 0} # デフォルト値
         try:
-            # テキスト全体から情報を探す（サイト構造変化に強いロジック）
             text = soup.get_text()
-            
-            # 風速抽出 (例: "風速3m")
             wind_match = re.search(r"風速.*?(\d+)m", text)
-            if wind_match:
-                weather_data["wind"] = int(wind_match.group(1))
-
-            # 波高抽出 (例: "波高3cm")
+            if wind_match: weather_data["wind"] = int(wind_match.group(1))
             wave_match = re.search(r"波高.*?(\d+)cm", text)
-            if wave_match:
-                weather_data["wave"] = int(wave_match.group(1))
-                
+            if wave_match: weather_data["wave"] = int(wave_match.group(1))
         except Exception as e:
             print(f"Weather parse warning: {e}")
-        
         return weather_data
 
     def get_race_details(self, jcd, race_no):
@@ -105,21 +96,20 @@ class KyoteiPredictor:
             "status": "future"
         }
 
-        # 1. 直前情報（気象）
+        # 1. 気象情報
         try:
             resp_info = self.fetch_page(info_url)
             if resp_info:
                 soup = BeautifulSoup(resp_info.text, 'html.parser')
                 race_data["weather"] = self.parse_weather(soup)
         except Exception:
-            pass # 気象が取れなくても処理は続ける
+            pass
 
         # 2. 出走表
         try:
             dfs = pd.read_html(list_url)
             racer_df = None
             for df in dfs:
-                # 6行のテーブルを探す
                 if len(df) == 6:
                     racer_df = df
                     break
@@ -127,15 +117,11 @@ class KyoteiPredictor:
             if racer_df is not None:
                 for idx, row in racer_df.iterrows():
                     row_str = str(row.values)
-                    
-                    # 級別簡易判定
+                    # 級別判定
                     racer_class = "B1"
                     if "A1" in row_str: racer_class = "A1"
                     elif "A2" in row_str: racer_class = "A2"
                     elif "B2" in row_str: racer_class = "B2"
-                    
-                    # モーター勝率などの抽出は複雑なため、簡易的にデフォルト値を設定
-                    # ※本格実装するにはHTMLセルごとのパースが必要
                     
                     race_data["racers"].append({
                         "lane": idx + 1,
@@ -152,15 +138,15 @@ class KyoteiPredictor:
         return race_data
 
     def predict(self, data):
-        """予測ロジック（Solid/Rough）"""
+        """本番用予測ロジック（Solid/Rough）"""
         if not data or len(data["racers"]) < 6: return None
 
         wind = data["weather"].get("wind", 0)
         wave = data["weather"].get("wave", 0)
         boat1 = data["racers"][0]
 
-        # 荒れ判定
         is_rough = False
+        # 荒れる条件: 風速4m以上, 波高4cm以上, 1号艇がB級
         if wind >= 4 or wave >= 4 or boat1["class"] in ["B1", "B2"]:
             is_rough = True
         
@@ -171,15 +157,18 @@ class KyoteiPredictor:
             score = 100
             lane = r["lane"]
             
-            # 基礎点・級別補正
+            # 基礎点
             score += {1: 50, 2: 30, 3: 20}.get(lane, 0)
+            # 級別補正
             if r["class"] == "A1": score += 40
             elif r["class"] == "A2": score += 20
 
             if is_rough:
+                # 荒れ: イン信頼度ダウン、カド(4)・アウト(5,6)評価アップ
                 if lane == 1: score -= 40
-                if lane >= 4: score += 35 # カドまくり評価
+                if lane >= 4: score += 35
             else:
+                # 堅実: イン信頼、ST重視
                 if lane == 1: score += 30
                 score += (0.20 - r["st"]) * 100
 
@@ -187,7 +176,6 @@ class KyoteiPredictor:
 
         scores.sort(key=lambda x: x["score"], reverse=True)
         
-        # 買い目 (3連単フォーメーション)
         o = [s["lane"] for s in scores]
         data["predictions"] = [
             f"{o[0]}-{o[1]}-{o[2]}",
@@ -197,61 +185,36 @@ class KyoteiPredictor:
         ]
         return data
 
-    def generate_mock_data(self):
-        """【新規】レースがない時用のダミーデータ生成"""
-        print("No active races found. Generating MOCK data for testing...")
-        mock_db = {}
-        mock_jcds = ["01", "02", "03"] # 桐生、戸田、江戸川
-        
-        for jcd in mock_jcds:
-            mock_db[jcd] = []
-            for r in range(1, 13):
-                is_rough = random.choice([True, False])
-                logic = "ROUGH" if is_rough else "SOLID"
-                
-                # ランダムな買い目
-                preds = [
-                    f"1-2-{random.randint(3,6)}",
-                    f"1-3-{random.randint(2,6)}",
-                    f"{random.randint(2,4)}-1-5",
-                    f"4-1-{random.randint(2,6)}"
-                ] if is_rough else [
-                    "1-2-3", "1-2-4", "1-3-2", "1-3-4"
-                ]
-                
-                mock_db[jcd].append({
-                    "jcd": jcd,
-                    "race_no": r,
-                    "prediction_logic": logic,
-                    "predictions": preds
-                })
-        return mock_db
-
     def run(self):
-        print("Starting Scraping Job...")
+        print(f"Starting REAL Scraping Job for {self.date_str}...")
         result_db = {}
         stadiums = self.get_active_stadiums()
         
         if not stadiums:
-            # レースがない、またはエラーで取れなかった場合はダミーデータを作成
-            result_db = self.generate_mock_data()
-        else:
-            print(f"Active Stadiums: {stadiums}")
-            for jcd in stadiums:
-                result_db[jcd] = []
-                for r in range(1, 13):
-                    print(f"Processing {jcd}R{r}...")
-                    raw_data = self.get_race_details(jcd, r)
-                    if raw_data:
-                        prediction = self.predict(raw_data)
-                        if prediction:
-                            result_db[jcd].append(prediction)
-                    time.sleep(1)
+            print("No active races found for today. Exiting.")
+            # ファイルを空にせず、既存データを残すか、空配列を保存するか
+            # ここでは「開催なし」として空ファイルを保存する
+            with open(f"{DATA_DIR}/latest_odds.json", "w", encoding="utf-8") as f:
+                json.dump({}, f, ensure_ascii=False, indent=2)
+            return
+
+        print(f"Active Stadiums: {stadiums}")
+        for jcd in stadiums:
+            result_db[jcd] = []
+            # 全12レース
+            for r in range(1, 13):
+                print(f"Processing {jcd}R{r}...")
+                raw_data = self.get_race_details(jcd, r)
+                if raw_data:
+                    prediction = self.predict(raw_data)
+                    if prediction:
+                        result_db[jcd].append(prediction)
+                time.sleep(1) # 負荷軽減
 
         # JSON保存
         with open(f"{DATA_DIR}/latest_odds.json", "w", encoding="utf-8") as f:
             json.dump(result_db, f, ensure_ascii=False, indent=2)
-        print(f"Done. Saved to {DATA_DIR}/latest_odds.json")
+        print(f"Success. Data saved to {DATA_DIR}/latest_odds.json")
 
 if __name__ == "__main__":
     KyoteiPredictor().run()
