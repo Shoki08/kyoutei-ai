@@ -18,6 +18,8 @@ os.makedirs(DATA_DIR, exist_ok=True)
 USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36"
 ]
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+]
 
 STADIUM_BIAS = {
     "01": "STRONG_INS", "02": "WEAK_INS", "03": "WEAK_INS", "04": "WEAK_INS", "05": "NORMAL",
